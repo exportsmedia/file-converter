@@ -1,0 +1,44 @@
+html,
+body.electron {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #ececec;
+}
+
+body.electron .window {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.titlebar {
+  -webkit-app-region: drag;
+}
+
+.window-controls,
+.win-btn,
+.add-btn,
+.icon-btn,
+.menu,
+.convert-btn,
+.select-wrap,
+.format-select,
+.check,
+.remove-btn {
+  -webkit-app-region: no-drag;
+}
+
+.win-btn {
+  cursor: pointer;
+}
+
+.hint {
+  margin: 0 8px;
+  padding: 8px 12px;
+  background: #fff3cd;
+  color: #7a5b00;
+  font-size: 13px;
+}
