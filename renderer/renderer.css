@@ -27,6 +27,7 @@ body.electron .window {
 .select-wrap,
 .format-select,
 .check,
+.more-btn,
 .remove-btn {
   -webkit-app-region: no-drag;
 }

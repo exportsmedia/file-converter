@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const fs = require("fs/promises");
 const path = require("path");
 const { canConvert } = require("./src/convert-map");
@@ -61,7 +61,10 @@ function mappedStatus(filePath) {
 }
 
 function outputNameFor(filePath) {
-  return plannedOutputName(path.basename(filePath), saveAs, { cleanNames });
+  return plannedOutputName(path.basename(filePath), saveAs, {
+    cleanNames,
+    folderName: path.dirname(filePath),
+  });
 }
 
 function refreshOutputNames() {
@@ -249,7 +252,7 @@ ipcMain.handle("select-files", async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ["openFile", "multiSelections"],
     filters: [
-      { name: "Archives", extensions: ["cbr", "rar", "cbz", "zip"] },
+      { name: "Archives", extensions: ["cbr", "rar", "cb7", "cbz", "zip"] },
       { name: "All files", extensions: ["*"] },
     ],
   });
@@ -302,6 +305,11 @@ ipcMain.handle("remove", (_event, id) => {
   return getState();
 });
 
+ipcMain.handle("reveal-item", (_event, id) => {
+  const item = items.find((entry) => entry.id === id);
+  if (item?.path) shell.showItemInFolder(item.path);
+});
+
 ipcMain.handle("clear-queue", () => {
   items = items.filter((item) => item.status !== "Waiting" && item.status !== "Skipped");
   sendState(true);
@@ -310,6 +318,12 @@ ipcMain.handle("clear-queue", () => {
 
 ipcMain.handle("clear-skipped", () => {
   items = items.filter((item) => item.status !== "Skipped");
+  sendState(true);
+  return getState();
+});
+
+ipcMain.handle("clear-failed", () => {
+  items = items.filter((item) => item.status !== "Failed");
   sendState(true);
   return getState();
 });

@@ -174,7 +174,9 @@ function run7z(sevenZip, args, { cwd, onProgress, signal } = {}) {
         return;
       }
       const lines = (stderr || stdout).trim().split(/\r?\n/).filter(Boolean);
-      reject(new ConvertError(`7-Zip failed (${lines[lines.length - 1] || `exit ${code}`})`));
+      const tail = lines.slice(-5);
+      const detail = tail.length ? tail.join("\n") : `exit ${code}`;
+      reject(new ConvertError(`7-Zip failed:\n${detail}`));
     });
   });
 }
@@ -243,7 +245,7 @@ function targetExt(saveAs) {
 
 function resolveOutputPath(sourcePath, saveAs, { cleanNames = false, comicInfo } = {}) {
   if (!cleanNames) return outputPath(sourcePath, saveAs);
-  const stem = cleanComicStem(path.basename(sourcePath), comicInfo);
+  const stem = cleanComicStem(path.basename(sourcePath), comicInfo, path.dirname(sourcePath));
   return path.join(path.dirname(sourcePath), `${stem}.${targetExt(saveAs)}`);
 }
 
@@ -253,9 +255,26 @@ function samePath(left, right) {
   return process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
 }
 
-function assertDestFree(dest) {
+function assertDestFree(dest, sourcePath) {
+  if (sourcePath && samePath(dest, sourcePath)) return;
   if (fsSync.existsSync(dest)) {
     throw new SkipError(`${path.basename(dest)} already exists`);
+  }
+}
+
+async function renameCaseOnly(sourcePath, dest) {
+  const dir = path.dirname(sourcePath);
+  const tmp = path.join(dir, `.fc-rename-${process.pid}-${Date.now()}${path.extname(dest)}`);
+  await fs.rename(sourcePath, tmp);
+  try {
+    await fs.rename(tmp, dest);
+  } catch (err) {
+    try {
+      await fs.rename(tmp, sourcePath);
+    } catch {
+      // Leave the temp name; better than losing the file.
+    }
+    throw err;
   }
 }
 
@@ -284,12 +303,16 @@ async function renameMatchingFile({ sourcePath, saveAs, sevenZip, onProgress = (
   const comicInfo = await peekComicInfo(sevenZip, sourcePath, signal);
   report(40);
   const dest = resolveOutputPath(sourcePath, saveAs, { cleanNames: true, comicInfo });
-  if (samePath(dest, sourcePath)) {
+  if (path.basename(dest) === path.basename(sourcePath)) {
     throw new SkipError("name already clean");
   }
-  assertDestFree(dest);
+  assertDestFree(dest, sourcePath);
   report(70);
-  await fs.rename(sourcePath, dest);
+  if (samePath(dest, sourcePath)) {
+    await renameCaseOnly(sourcePath, dest);
+  } else {
+    await fs.rename(sourcePath, dest);
+  }
   report(100);
   return { dest, detail: `renamed to ${path.basename(dest)}` };
 }

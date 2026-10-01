@@ -1,6 +1,6 @@
 # File Converter
 
-Electron app that converts **CBR/RAR** archives to **ZIP** or **CBZ**. After a successful conversion it can **delete the original file**.
+Electron app that converts **CBR/RAR/CB7** archives to **ZIP** or **CBZ**. After a successful conversion it can **delete the original file**.
 
 ## Requirements
 
@@ -84,17 +84,17 @@ sudo dpkg -i file-converter_1.0.0_amd64.deb
 - **+ add files** / **Add folder** / drop files onto the window
 - **Save as** ZIP or CBZ (CBZ is the default)
 - Convert writes next to the source, then deletes the original if that checkbox is on
-- **Clean comic names** (on by default) writes `Series 003 (Year)` — ComicInfo.xml when present, otherwise it strips scene tags like `(digital)` and scanner groups from the filename. Already-matching ZIP/CBZ files are renamed in place when the cleaned name differs; if the name is already clean they are skipped. Unsupported types stay skipped.
+- **Clean comic names** (on by default) writes `Series 003 (Year)` — ComicInfo.xml when present, otherwise it strips scene tags like `(digital)` and scanner groups from the filename. Already-matching ZIP/CBZ files are renamed in place when the cleaned name differs (including oddly cased extensions like `.cbZ` → `.cbz`); if the name is already clean they are skipped. Unsupported types stay skipped.
 - You can add or remove Waiting/Skipped rows while a run is going; **Stop** cancels the current file
 
 ## Conversion map (v1)
 
 | Save as | Converts from | Skipped |
 | --- | --- | --- |
-| ZIP | `.cbr`, `.rar` | already `.zip` when Clean comic names is off; plus `.pdf`, `.docx`, images, and anything else |
-| CBZ | `.cbr`, `.rar` | already `.cbz` when Clean comic names is off; plus the same unsupported types |
+| ZIP | `.cbr`, `.rar`, `.cb7` | already `.zip` when Clean comic names is off; plus `.pdf`, `.docx`, images, and anything else |
+| CBZ | `.cbr`, `.rar`, `.cb7` | already `.cbz` when Clean comic names is off; plus the same unsupported types |
 
-When Clean comic names is on, already-matching `.zip` / `.cbz` files are renamed in place when the cleaned name differs (no re-archive); if the name is already clean they are **Skipped**. Unsupported files still show in the list as **Skipped**. They are not written and the original is not deleted.
+When Clean comic names is on, already-matching `.zip` / `.cbz` files are renamed in place when the cleaned name differs (no re-archive), including normalizing the extension to lowercase; if the name is already clean they are **Skipped**. Unsupported files still show in the list as **Skipped**. They are not written and the original is not deleted.
 
 ## License
 

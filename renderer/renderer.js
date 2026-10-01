@@ -6,13 +6,22 @@ const settingsBtn = document.getElementById("settingsBtn");
 const settingsMenu = document.getElementById("settingsMenu");
 const clearQueueBtn = document.getElementById("clearQueueBtn");
 const clearSkippedBtn = document.getElementById("clearSkippedBtn");
+const clearFailedBtn = document.getElementById("clearFailedBtn");
 const clearAllBtn = document.getElementById("clearAllBtn");
 const cancelAllBtn = document.getElementById("cancelAllBtn");
+const clearFailuresBtn = document.getElementById("clearFailuresBtn");
 const dropzone = document.getElementById("dropzone");
 const emptyState = document.getElementById("emptyState");
 const tableWrap = document.getElementById("tableWrap");
 const fileBody = document.getElementById("fileBody");
+const rowMenu = document.getElementById("rowMenu");
 const badge = document.getElementById("badge");
+const failBadge = document.getElementById("failBadge");
+const filesTab = document.getElementById("filesTab");
+const logTab = document.getElementById("logTab");
+const filesPanel = document.getElementById("filesPanel");
+const logPanel = document.getElementById("logPanel");
+const logList = document.getElementById("logList");
 const convertBtn = document.getElementById("convertBtn");
 const overall = document.getElementById("overall");
 const overallFill = document.getElementById("overallFill");
@@ -30,6 +39,9 @@ let state = {
   running: false,
   sevenZipMissing: false,
 };
+
+let rowMenuId = null;
+let activeTab = "files";
 
 function escapeHtml(value) {
   return String(value || "")
@@ -62,12 +74,54 @@ function rowCaption(item) {
   return item.folder;
 }
 
+function setActiveTab(tab) {
+  activeTab = tab === "log" ? "log" : "files";
+  const onFiles = activeTab === "files";
+  filesTab.classList.toggle("is-active", onFiles);
+  logTab.classList.toggle("is-active", !onFiles);
+  filesTab.setAttribute("aria-selected", onFiles ? "true" : "false");
+  logTab.setAttribute("aria-selected", onFiles ? "false" : "true");
+  filesPanel.hidden = !onFiles;
+  logPanel.hidden = onFiles;
+}
+
+function renderFailureLog(failedItems) {
+  clearFailuresBtn.disabled = failedItems.length === 0;
+  clearFailedBtn.disabled = failedItems.length === 0;
+
+  if (!failedItems.length) {
+    logList.innerHTML = `
+      <div class="empty" id="logEmpty">
+        <p>No failures</p>
+        <p class="empty-hint">Convert errors will appear here</p>
+      </div>
+    `;
+    return;
+  }
+
+  logList.innerHTML = failedItems
+    .map(
+      (item) => `
+      <article class="log-entry">
+        <div class="log-entry-head">
+          <div class="log-entry-name">${escapeHtml(item.name)}</div>
+          <div class="log-entry-time">${formatTime(item.elapsed)}</div>
+        </div>
+        <div class="log-entry-path" title="${escapeHtml(item.path || item.folder || "")}">${escapeHtml(item.path || item.folder || "")}</div>
+        <pre class="log-entry-reason">${escapeHtml(item.reason || "Unknown error")}</pre>
+      </article>
+    `
+    )
+    .join("");
+}
+
 function render() {
   const items = state.items || [];
   const total = items.length;
   const done = items.filter((item) => item.status === "Done").length;
   const skipped = items.filter((item) => item.status === "Skipped").length;
-  const failed = items.filter((item) => item.status === "Failed").length;
+  const failedItems = items.filter((item) => item.status === "Failed");
+  const failed = failedItems.length;
   const waiting = items.filter((item) => item.status === "Waiting").length;
   const converting = items.filter((item) => item.status === "Converting").length;
   const activeItems = items.filter((item) => item.status !== "Skipped");
@@ -82,6 +136,8 @@ function render() {
   tableWrap.hidden = total === 0;
   badge.hidden = total === 0;
   badge.textContent = String(total);
+  failBadge.hidden = failed === 0;
+  failBadge.textContent = String(failed);
   sevenZipHint.hidden = !state.sevenZipMissing;
   convertBtn.disabled =
     state.sevenZipMissing || (waiting === 0 && converting === 0 && !state.running);
@@ -120,12 +176,21 @@ function render() {
         </td>
         <td class="col-time">${formatTime(item.elapsed)}</td>
         <td class="col-action">
-          <button type="button" class="remove-btn" data-remove="${item.id}" aria-label="Remove">×</button>
+          <div class="row-actions">
+            <button type="button" class="more-btn${rowMenuId === item.id ? " is-open" : ""}" data-row-menu="${item.id}" aria-label="More actions" aria-haspopup="menu" aria-expanded="${rowMenuId === item.id ? "true" : "false"}">⋯</button>
+            <button type="button" class="remove-btn" data-remove="${item.id}" aria-label="Remove">×</button>
+          </div>
         </td>
       </tr>
     `
     )
     .join("");
+
+  renderFailureLog(failedItems);
+
+  if (rowMenuId != null && !items.some((item) => item.id === rowMenuId)) {
+    closeRowMenu();
+  }
 }
 
 function applyState(next) {
@@ -145,10 +210,47 @@ function closeSettingsMenu() {
   settingsBtn.setAttribute("aria-expanded", "false");
 }
 
+function closeRowMenu() {
+  rowMenu.hidden = true;
+  rowMenuId = null;
+  fileBody.querySelectorAll(".more-btn.is-open").forEach((button) => {
+    button.classList.remove("is-open");
+    button.setAttribute("aria-expanded", "false");
+  });
+}
+
+function openRowMenu(button, id) {
+  closeAddMenu();
+  closeSettingsMenu();
+  rowMenuId = id;
+  const rect = button.getBoundingClientRect();
+  rowMenu.hidden = false;
+  rowMenu.style.top = `${rect.bottom + 4}px`;
+  rowMenu.style.right = `${window.innerWidth - rect.right}px`;
+  rowMenu.style.left = "auto";
+  fileBody.querySelectorAll(".more-btn").forEach((btn) => {
+    const open = Number(btn.dataset.rowMenu) === id;
+    btn.classList.toggle("is-open", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+}
+
+async function clearFailures() {
+  applyState(await window.converter.clearFailed());
+}
+
+filesTab.addEventListener("click", () => setActiveTab("files"));
+logTab.addEventListener("click", () => setActiveTab("log"));
+
+clearFailuresBtn.addEventListener("click", async () => {
+  await clearFailures();
+});
+
 addBtn.addEventListener("click", (event) => {
   event.stopPropagation();
   const open = addMenu.hidden;
   closeSettingsMenu();
+  closeRowMenu();
   addMenu.hidden = !open;
   addWrap.classList.toggle("is-open", open);
 });
@@ -165,6 +267,7 @@ settingsBtn.addEventListener("click", (event) => {
   event.stopPropagation();
   const open = settingsMenu.hidden;
   closeAddMenu();
+  closeRowMenu();
   settingsMenu.hidden = !open;
   settingsWrap.classList.toggle("is-open", open);
   settingsBtn.setAttribute("aria-expanded", open ? "true" : "false");
@@ -176,18 +279,45 @@ settingsMenu.addEventListener("click", async (event) => {
   closeSettingsMenu();
   if (button.dataset.settings === "clear") applyState(await window.converter.clearQueue());
   if (button.dataset.settings === "clear-skipped") applyState(await window.converter.clearSkipped());
+  if (button.dataset.settings === "clear-failed") await clearFailures();
   if (button.dataset.settings === "clear-all") applyState(await window.converter.clearAll());
   if (button.dataset.settings === "cancel") applyState(await window.converter.stop());
+});
+
+rowMenu.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-row-action]");
+  if (!button) return;
+  const id = rowMenuId;
+  closeRowMenu();
+  if (button.dataset.rowAction === "reveal" && id != null) {
+    await window.converter.revealItem(id);
+  }
 });
 
 document.addEventListener("click", (event) => {
   if (!addWrap.contains(event.target)) closeAddMenu();
   if (!settingsWrap.contains(event.target)) closeSettingsMenu();
+  if (!rowMenu.contains(event.target) && !event.target.closest("[data-row-menu]")) {
+    closeRowMenu();
+  }
 });
 
 fileBody.addEventListener("click", async (event) => {
+  const menuButton = event.target.closest("[data-row-menu]");
+  if (menuButton) {
+    event.stopPropagation();
+    const id = Number(menuButton.dataset.rowMenu);
+    if (rowMenuId === id && !rowMenu.hidden) {
+      closeRowMenu();
+      return;
+    }
+    openRowMenu(menuButton, id);
+    return;
+  }
+
   const button = event.target.closest("[data-remove]");
   if (!button) return;
+  closeRowMenu();
   applyState(await window.converter.remove(Number(button.dataset.remove)));
 });
 
@@ -237,4 +367,5 @@ dropzone.addEventListener("drop", async (event) => {
 
 window.converter.onQueueUpdated(applyState);
 window.converter.getState().then(applyState);
+setActiveTab("files");
 render();

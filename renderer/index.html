@@ -27,10 +27,14 @@
         </div>
       </header>
 
-      <div class="tabbar">
-        <button type="button" class="tab is-active">
+      <div class="tabbar" role="tablist">
+        <button type="button" class="tab is-active" id="filesTab" data-tab="files" role="tab" aria-selected="true">
           Files to convert
           <span class="badge" id="badge" hidden>0</span>
+        </button>
+        <button type="button" class="tab" id="logTab" data-tab="log" role="tab" aria-selected="false">
+          Failure log
+          <span class="badge badge-fail" id="failBadge" hidden>0</span>
         </button>
       </div>
 
@@ -39,60 +43,75 @@
       </p>
 
       <main class="workspace">
-        <div class="toolbar">
-          <div class="add-wrap" id="addWrap">
-            <button type="button" class="add-btn" id="addBtn">
-              <span class="plus">+</span> add files
-            </button>
-            <div class="menu" id="addMenu" hidden>
-              <button type="button" data-add="files">Add files...</button>
-              <button type="button" data-add="folder">Add folder...</button>
-            </div>
-          </div>
-          <div class="toolbar-right">
-            <div class="settings-wrap" id="settingsWrap">
-              <button type="button" class="icon-btn" id="settingsBtn" aria-label="Queue settings" aria-haspopup="menu" aria-expanded="false">
-                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-                  <path fill="currentColor" d="M6.3 1h3.4l.3 1.6c.47.14.9.35 1.3.64l1.5-.5 1.7 3-1.2 1.1c.08.4.13.8.13 1.16s-.05.77-.13 1.16l1.2 1.1-1.7 3-1.5-.5c-.4.29-.83.5-1.3.64L9.7 15H6.3l-.3-1.6c-.47-.14-.9-.35-1.3-.64l-1.5.5-1.7-3 1.2-1.1A5.3 5.3 0 0 1 2.5 8c0-.39.05-.77.13-1.16l-1.2-1.1 1.7-3 1.5.5c.4-.29.83-.5 1.3-.64L6.3 1zM8 6.2A1.8 1.8 0 1 0 8 9.8 1.8 1.8 0 0 0 8 6.2z"/>
-                </svg>
+        <div class="panel" id="filesPanel" role="tabpanel">
+          <div class="toolbar">
+            <div class="add-wrap" id="addWrap">
+              <button type="button" class="add-btn" id="addBtn">
+                <span class="plus">+</span> add files
               </button>
-              <div class="menu menu-right" id="settingsMenu" hidden role="menu">
-                <button type="button" id="clearQueueBtn" data-settings="clear" role="menuitem">Clear queue</button>
-                <button type="button" id="clearSkippedBtn" data-settings="clear-skipped" role="menuitem">Clear skipped</button>
-                <button type="button" id="clearAllBtn" data-settings="clear-all" role="menuitem">Clear all</button>
-                <button type="button" id="cancelAllBtn" data-settings="cancel" role="menuitem" disabled>Cancel all</button>
+              <div class="menu" id="addMenu" hidden>
+                <button type="button" data-add="files">Add files...</button>
+                <button type="button" data-add="folder">Add folder...</button>
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <div class="settings-wrap" id="settingsWrap">
+                <button type="button" class="icon-btn" id="settingsBtn" aria-label="Queue settings" aria-haspopup="menu" aria-expanded="false">
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                    <path fill="currentColor" d="M6.3 1h3.4l.3 1.6c.47.14.9.35 1.3.64l1.5-.5 1.7 3-1.2 1.1c.08.4.13.8.13 1.16s-.05.77-.13 1.16l1.2 1.1-1.7 3-1.5-.5c-.4.29-.83.5-1.3.64L9.7 15H6.3l-.3-1.6c-.47-.14-.9-.35-1.3-.64l-1.5.5-1.7-3 1.2-1.1A5.3 5.3 0 0 1 2.5 8c0-.39.05-.77.13-1.16l-1.2-1.1 1.7-3 1.5.5c.4-.29.83-.5 1.3-.64L6.3 1zM8 6.2A1.8 1.8 0 1 0 8 9.8 1.8 1.8 0 0 0 8 6.2z"/>
+                  </svg>
+                </button>
+                <div class="menu menu-right" id="settingsMenu" hidden role="menu">
+                  <button type="button" id="clearQueueBtn" data-settings="clear" role="menuitem">Clear queue</button>
+                  <button type="button" id="clearSkippedBtn" data-settings="clear-skipped" role="menuitem">Clear skipped</button>
+                  <button type="button" id="clearFailedBtn" data-settings="clear-failed" role="menuitem">Clear failures</button>
+                  <button type="button" id="clearAllBtn" data-settings="clear-all" role="menuitem">Clear all</button>
+                  <button type="button" id="cancelAllBtn" data-settings="cancel" role="menuitem" disabled>Cancel all</button>
+                </div>
               </div>
             </div>
           </div>
+
+          <div class="dropzone" id="dropzone">
+            <div class="empty" id="emptyState">
+              <p>add files here</p>
+              <p class="empty-hint">Drop a folder, or use + add files</p>
+            </div>
+
+            <div class="table-wrap" id="tableWrap" hidden>
+              <table class="file-table">
+                <thead>
+                  <tr>
+                    <th class="col-name">Name</th>
+                    <th class="col-status">Status</th>
+                    <th class="col-progress">Progress</th>
+                    <th class="col-time">Processing time</th>
+                    <th class="col-action"></th>
+                  </tr>
+                </thead>
+                <tbody id="fileBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="overall" id="overall" hidden>
+            <div class="overall-bar">
+              <div class="overall-fill" id="overallFill"></div>
+            </div>
+            <p class="overall-label" id="overallLabel">0 / 0</p>
+          </div>
         </div>
 
-        <div class="dropzone" id="dropzone">
-          <div class="empty" id="emptyState">
-            <p>add files here</p>
-            <p class="empty-hint">Drop a folder, or use + add files</p>
+        <div class="panel" id="logPanel" role="tabpanel" hidden>
+          <div class="toolbar">
+            <button type="button" class="add-btn" id="clearFailuresBtn" disabled>Clear failures</button>
           </div>
-
-          <div class="table-wrap" id="tableWrap" hidden>
-            <table class="file-table">
-              <thead>
-                <tr>
-                  <th class="col-name">Name</th>
-                  <th class="col-status">Status</th>
-                  <th class="col-progress">Progress</th>
-                  <th class="col-time">Processing time</th>
-                  <th class="col-action"></th>
-                </tr>
-              </thead>
-              <tbody id="fileBody"></tbody>
-            </table>
+          <div class="log-panel" id="logList">
+            <div class="empty" id="logEmpty">
+              <p>No failures</p>
+              <p class="empty-hint">Convert errors will appear here</p>
+            </div>
           </div>
-        </div>
-
-        <div class="overall" id="overall" hidden>
-          <div class="overall-bar">
-            <div class="overall-fill" id="overallFill"></div>
-          </div>
-          <p class="overall-label" id="overallLabel">0 / 0</p>
         </div>
       </main>
 
@@ -125,6 +144,10 @@
 
         <button type="button" class="convert-btn" id="convertBtn" disabled>Convert</button>
       </footer>
+    </div>
+
+    <div class="menu menu-right row-menu" id="rowMenu" hidden role="menu">
+      <button type="button" data-row-action="reveal" role="menuitem">Open file location</button>
     </div>
 
     <script src="renderer.js"></script>

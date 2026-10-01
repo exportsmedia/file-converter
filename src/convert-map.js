@@ -6,8 +6,8 @@
   }
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   const CONVERT_MAP = {
-    zip: [".cbr", ".rar"],
-    cbz: [".cbr", ".rar"],
+    zip: [".cbr", ".rar", ".cb7"],
+    cbz: [".cbr", ".rar", ".cb7"],
   };
 
   function extensionOf(name) {

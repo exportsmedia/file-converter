@@ -163,6 +163,11 @@ body {
   background: transparent;
   color: #444;
   font: inherit;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: #222;
 }
 
 .tab.is-active {
@@ -195,6 +200,10 @@ body {
   font-size: 13px;
 }
 
+.badge-fail {
+  background: var(--danger);
+}
+
 .workspace {
   display: flex;
   flex: 1;
@@ -206,6 +215,77 @@ body {
   border: 1px solid var(--chrome-border);
   border-bottom: 0;
   border-radius: 6px 6px 0 0;
+}
+
+.panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.log-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  margin: 0 12px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.log-entry {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.log-entry:last-child {
+  border-bottom: 0;
+}
+
+.log-entry-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.log-entry-name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-entry-time {
+  flex-shrink: 0;
+  color: #888;
+  font-size: 12px;
+}
+
+.log-entry-path {
+  margin-bottom: 6px;
+  overflow: hidden;
+  color: #888;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-entry-reason {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: #fdecec;
+  color: var(--danger);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .toolbar {
@@ -411,8 +491,14 @@ body {
 }
 
 .col-action {
-  width: 40px;
+  width: 72px;
   text-align: center;
+}
+
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .file-name {
@@ -498,6 +584,7 @@ body {
   text-align: right;
 }
 
+.more-btn,
 .remove-btn {
   width: 24px;
   height: 24px;
@@ -510,9 +597,25 @@ body {
   cursor: pointer;
 }
 
+.more-btn {
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.more-btn:hover,
+.more-btn.is-open {
+  background: #ececec;
+  color: #333;
+}
+
 .remove-btn:hover {
   background: #f3d6d6;
   color: var(--danger);
+}
+
+.row-menu {
+  position: fixed;
+  z-index: 20;
 }
 
 .overall {

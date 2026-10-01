@@ -1,10 +1,17 @@
+const path = require("path");
+
 const YEAR_RE = /^(19|20)\d{2}$/;
 const ISSUE_RANGE_RE = /^(\d{1,4})\s*-\s*(\d{1,4})$/;
 const ISSUE_NUMBER_RE = /^(\d{1,4})(\.\d+)?$/;
+const ISSUE_OF_RE = /^(\d{1,4})\s*OF\s*(\d{1,4})$/i;
+const ISSUE_OF_ONLY_RE = /^OF\s*\d{1,4}$/i;
 const ISSUE_AT_END_RE =
   /^(.*?)[\s_]+(?:#|no\.?\s*)?(\d{1,4}(?:\.\d+)?|\d{1,4}\s*-\s*\d{1,4})$/i;
 const VOLUME_PREFIX_RE = /(?:^|[\s._-])(vol\.?|volume|v)$/i;
 const PAREN_OR_BRACKET_RE = /[([].*?[\])]/g;
+const ORPHAN_ISSUE_MARKER_RE = /(?:^|[\s_]+)(?:#|no\.?\s*)$/i;
+const SCANNER_SITE_TOKEN_RE =
+  /(?:^|[\s_]+)(?:GetComics(?:\.INFO)?|[A-Za-z][\w-]*\.(?:INFO|COM|NET|ORG|TO|CC))(?=[\s_]|$)/gi;
 const WINDOWS_ILLEGAL = /[<>:"/\\|?*\u0000-\u001f]/g;
 const XML_TAG_RE = (tag) => new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, "i");
 
@@ -55,6 +62,8 @@ function padIssue(raw) {
     .trim()
     .replace(/^#/, "");
   if (!text) return "";
+  const ofMatch = text.match(ISSUE_OF_RE);
+  if (ofMatch) return padDigits(ofMatch[1]);
   const range = text.match(ISSUE_RANGE_RE);
   if (range) return `${padDigits(range[1])}-${padDigits(range[2])}`;
   const number = text.match(ISSUE_NUMBER_RE);
@@ -112,6 +121,57 @@ function yearFromGroups(groups) {
   return "";
 }
 
+function issueFromGroups(groups) {
+  let issue = "";
+  for (const group of groups) {
+    const trimmed = String(group || "").trim();
+    if (!trimmed) continue;
+    const compact = trimmed.replace(/\s+/g, "");
+    if (YEAR_RE.test(compact)) continue;
+    if (ISSUE_OF_ONLY_RE.test(trimmed)) continue;
+    const ofMatch = trimmed.match(ISSUE_OF_RE);
+    if (ofMatch) {
+      issue = ofMatch[1];
+      continue;
+    }
+    if (ISSUE_NUMBER_RE.test(compact) || ISSUE_RANGE_RE.test(compact)) issue = compact;
+  }
+  return issue;
+}
+
+function isIssueLike(text) {
+  const value = String(text || "")
+    .trim()
+    .replace(/^#/, "");
+  if (!value) return false;
+  if (ISSUE_OF_RE.test(value)) return true;
+  const compact = value.replace(/\s+/g, "");
+  return ISSUE_NUMBER_RE.test(compact) || ISSUE_RANGE_RE.test(compact);
+}
+
+function issueFromText(text) {
+  const value = String(text || "")
+    .trim()
+    .replace(/^#/, "");
+  const ofMatch = value.match(ISSUE_OF_RE);
+  if (ofMatch) return ofMatch[1];
+  return value.replace(/\s+/g, "");
+}
+
+function stripOrphanIssueMarker(text) {
+  return String(text || "")
+    .replace(ORPHAN_ISSUE_MARKER_RE, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stripScannerTags(text) {
+  return String(text || "")
+    .replace(SCANNER_SITE_TOKEN_RE, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function stripExtension(fileName) {
   const base = String(fileName || "")
     .split(/[/\\]/)
@@ -119,41 +179,98 @@ function stripExtension(fileName) {
   return base.replace(/\.[^./\\]+$/i, "");
 }
 
-function nameFromFilename(fileName) {
-  const stem = stripExtension(fileName).replace(/_+/g, " ");
+function folderBasename(folderName) {
+  if (!folderName) return "";
+  const base = path.basename(String(folderName).replace(/[/\\]+$/, ""));
+  return base && base !== "." && base !== ".." ? base : "";
+}
+
+function parseStemParts(stem) {
+  const text = String(stem || "").replace(/_+/g, " ");
+  const groups = [...text.matchAll(PAREN_OR_BRACKET_RE)].map((match) =>
+    match[0].slice(1, -1)
+  );
+  const year = yearFromGroups(groups);
+  let number = issueFromGroups(groups);
+  let series = stripScannerTags(
+    text
+      .replace(PAREN_OR_BRACKET_RE, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
+
+  if (!number) {
+    const issueMatch = series.match(ISSUE_AT_END_RE);
+    if (issueMatch && !VOLUME_PREFIX_RE.test(issueMatch[1].trim())) {
+      series = issueMatch[1].trim();
+      number = issueMatch[2].replace(/\s+/g, "");
+    }
+  }
+
+  series = stripOrphanIssueMarker(series);
+
+  if (!number && isIssueLike(series)) {
+    number = issueFromText(series);
+    series = "";
+  }
+
+  return { series, number, year };
+}
+
+function parseFolderParts(folderName) {
+  const stem = folderBasename(folderName).replace(/_+/g, " ");
+  if (!stem) return { series: "", year: "" };
   const groups = [...stem.matchAll(PAREN_OR_BRACKET_RE)].map((match) =>
     match[0].slice(1, -1)
   );
   const year = yearFromGroups(groups);
-  const stripped = stem
+  // Keep non-year paren text out of the series, but do not treat trailing
+  // collection ranges (#001 - #713) as an issue number.
+  let series = stem
     .replace(PAREN_OR_BRACKET_RE, " ")
     .replace(/\s+/g, " ")
     .trim();
-  const issueMatch = stripped.match(ISSUE_AT_END_RE);
-  if (issueMatch && !VOLUME_PREFIX_RE.test(issueMatch[1].trim())) {
-    return formatComicName({
-      series: issueMatch[1],
-      number: issueMatch[2].replace(/\s+/g, ""),
-      year,
-    });
-  }
-  return formatComicName({ series: stripped, year });
+  series = stripOrphanIssueMarker(series);
+  return { series, year };
 }
 
-function cleanComicStem(fileName, comicInfo) {
-  return nameFromComicInfo(comicInfo) || nameFromFilename(fileName);
+function nameFromFilename(fileName, folderName) {
+  const parsed = parseStemParts(stripExtension(fileName));
+  let { series, number, year } = parsed;
+
+  if (!series || isIssueLike(series)) {
+    if (isIssueLike(series) && !number) {
+      number = issueFromText(series);
+    }
+    const folderParts = parseFolderParts(folderName);
+    if (folderParts.series) {
+      series = folderParts.series;
+      if (!year && folderParts.year) year = folderParts.year;
+    } else if (isIssueLike(series)) {
+      series = "";
+    }
+  }
+
+  return formatComicName({ series, number, year });
+}
+
+function cleanComicStem(fileName, comicInfo, folderName) {
+  return nameFromComicInfo(comicInfo) || nameFromFilename(fileName, folderName);
 }
 
 function targetExt(saveAs) {
   return String(saveAs || "zip").toLowerCase().replace(/^\./, "");
 }
 
-function plannedOutputName(fileName, saveAs, { cleanNames = false } = {}) {
+function plannedOutputName(fileName, saveAs, { cleanNames = false, folderName } = {}) {
   const ext = targetExt(saveAs);
   if (!cleanNames) {
     return stripExtension(fileName) + `.${ext}`;
   }
-  return `${cleanComicStem(fileName)}.${ext}`;
+  const folder = folderName || (fileName && fileName !== path.basename(fileName)
+    ? path.dirname(fileName)
+    : "");
+  return `${cleanComicStem(path.basename(fileName), null, folder)}.${ext}`;
 }
 
 module.exports = {
